@@ -1021,9 +1021,50 @@ async def chat(req: ChatRequest):
             )
 
         if _is_db_analytics_query(req.message):
+            fallback_plan = _generate_plan_with_rules(req.message)
+            if fallback_plan:
+                data: list[dict[str, Any]] = []
+                db_error = None
+                logger.info(
+                    "executing_sql",
+                    extra={"sql": fallback_plan.sql, "translator": "rules_fallback"},
+                )
+                try:
+                    data = _execute_sql_via_mcp(fallback_plan.sql)
+                except Exception as exc:
+                    db_error = str(exc)
+                    logger.error(
+                        "sql_error",
+                        extra={"error": db_error, "sql": fallback_plan.sql},
+                    )
+
+                text_response = _summarize_results(fallback_plan, data, db_error)
+                entry = {
+                    "id": len(query_history) + 1,
+                    "query": req.message,
+                    "sql": fallback_plan.sql,
+                    "row_count": len(data),
+                    "chart_type": fallback_plan.chart_type,
+                    "source": "rules_fallback",
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+                query_history.append(entry)
+                return ChatResponse(
+                    text=text_response,
+                    sql=fallback_plan.sql,
+                    data=data,
+                    chart_type=fallback_plan.chart_type,
+                    x_key=fallback_plan.x_key,
+                    y_key=fallback_plan.y_key,
+                    row_count=len(data),
+                    timestamp=datetime.utcnow().isoformat(),
+                )
+
             text_response = (
-                "I couldn't generate a valid dynamic SQL plan for this DB question right now. "
-                "Please retry in a moment. If this continues, verify GEMINI_API_KEY, GEMINI_MODEL, and outbound network access."
+                "I couldn't map this database question to a safe SQL template right now. "
+                "Try phrasing it with explicit metrics and dimensions, for example: "
+                "'top 5 countries by readers in last 30 days' or "
+                "'daily views for DevOps in last 14 days'."
             )
             entry = {
                 "id": len(query_history) + 1,

@@ -402,16 +402,44 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
+      "id": 9,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"supachat-backend\"}[5m])) by (le))",
+          "legendFormat": "p95 latency",
+          "refId": "A"
+        }
+      ],
+      "title": "Backend p95 Latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
         "type": "loki",
         "uid": "loki"
       },
       "gridPos": {
         "h": 10,
-        "w": 24,
-        "x": 0,
+        "w": 12,
+        "x": 12,
         "y": 21
       },
-      "id": 9,
+      "id": 10,
       "options": {
         "dedupStrategy": "none",
         "enableLogDetails": true,
@@ -430,6 +458,38 @@
         }
       ],
       "title": "Recent Container Logs",
+      "type": "logs"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
+      "id": 11,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "targets": [
+        {
+          "expr": "{job=\"docker\"} |~ \"(?i)error|exception|traceback|failed\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent Error Logs",
       "type": "logs"
     }
   ],
@@ -451,6 +511,6 @@
   "timezone": "browser",
   "title": "SupaChat Observability",
   "uid": "supachat-observability",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }

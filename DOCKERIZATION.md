@@ -52,9 +52,8 @@ Replace `<VM_PUBLIC_IP>` with your Azure VM public IP:
 - Backend health via Nginx: `http://<VM_PUBLIC_IP>/health`
 - Prometheus: `http://<VM_PUBLIC_IP>:9090`
 - Grafana: `http://<VM_PUBLIC_IP>:3001`
-- cAdvisor: `http://<VM_PUBLIC_IP>:8080`
 
-`node-exporter` is internal-only and scraped by Prometheus over the Docker network.
+`cAdvisor` and `node-exporter` are internal-only and scraped by Prometheus over the Docker network.
 
 Grafana default credentials come from `.env.compose`.
 
@@ -63,7 +62,6 @@ Grafana default credentials come from `.env.compose`.
 - `80` (application)
 - `9090` (Prometheus)
 - `3001` (Grafana)
-- `8080` (cAdvisor)
 
 If you want fewer public ports, keep only `80` and access monitoring through SSH tunneling.
 

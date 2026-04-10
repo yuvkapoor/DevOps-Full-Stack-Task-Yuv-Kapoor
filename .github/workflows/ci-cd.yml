@@ -109,6 +109,7 @@ jobs:
     needs: build-and-push
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: SUPACHAT
     steps:
       - name: Deploy to Azure Ubuntu VM
         uses: appleboy/ssh-action@v1.2.0
@@ -119,12 +120,13 @@ jobs:
           GHCR_USER: ${{ github.actor }}
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
           APP_DIR: ${{ secrets.AZURE_VM_APP_DIR }}
+          REPO_URL: https://github.com/${{ github.repository }}.git
         with:
           host: ${{ secrets.AZURE_VM_HOST }}
           username: ${{ secrets.AZURE_VM_USER }}
           key: ${{ secrets.AZURE_VM_SSH_KEY }}
           port: ${{ secrets.AZURE_VM_SSH_PORT }}
-          envs: BACKEND_IMAGE,FRONTEND_IMAGE,MCP_IMAGE,GHCR_USER,GHCR_PAT,APP_DIR
+          envs: BACKEND_IMAGE,FRONTEND_IMAGE,MCP_IMAGE,GHCR_USER,GHCR_PAT,APP_DIR,REPO_URL
           script: |
             set -euo pipefail
             APP_DIR="${APP_DIR:-/opt/supachat}"
@@ -136,13 +138,19 @@ jobs:
 
             cd "${APP_DIR}"
 
-            if [ -d ".git" ]; then
-              git fetch origin main
-              git checkout main
-              git reset --hard origin/main
-            else
-              echo "No .git directory found in ${APP_DIR}; using existing VM project files."
+            if [ ! -d ".git" ]; then
+              echo "No .git directory found in ${APP_DIR}; bootstrapping repository metadata."
+              git init
+              if git remote get-url origin >/dev/null 2>&1; then
+                git remote set-url origin "${REPO_URL}"
+              else
+                git remote add origin "${REPO_URL}"
+              fi
             fi
+
+            git fetch origin main
+            git checkout -B main origin/main
+            git reset --hard origin/main
 
             echo "${GHCR_PAT}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
             export BACKEND_IMAGE FRONTEND_IMAGE MCP_IMAGE

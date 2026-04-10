@@ -46,8 +46,13 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      - name: Prepare CI env files
+        run: |
+          cp backend/.env.example backend/.env
+          cp .env.compose.example .env.compose
+
       - name: Validate Docker Compose files
-        run: docker compose -f docker-compose.yml -f docker-compose.build.yml config > /tmp/supachat-compose.yaml
+        run: docker compose --env-file .env.compose -f docker-compose.yml -f docker-compose.build.yml config > /tmp/supachat-compose.yaml
 
   build-and-push:
     needs: validate

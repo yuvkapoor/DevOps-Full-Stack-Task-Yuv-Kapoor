@@ -1,0 +1,18 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: ${BACKEND_IMAGE:-supachat/backend:latest}
+
+  mcp-server:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: ${MCP_IMAGE:-supachat/backend:latest}
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: ${FRONTEND_IMAGE:-supachat/frontend:latest}

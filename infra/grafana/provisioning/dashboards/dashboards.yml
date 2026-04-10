@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: "SupaChat Dashboards"
+    orgId: 1
+    folder: "SupaChat"
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

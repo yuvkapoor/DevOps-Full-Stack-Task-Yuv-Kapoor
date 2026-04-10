@@ -7,13 +7,21 @@ from datetime import datetime
 from typing import Any, Optional
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from prometheus_fastapi_instrumentator import Instrumentator
 from pythonjsonlogger import jsonlogger
 
 from database import execute_query, test_connection
+from devops_agent import (
+    DevOpsAgentError,
+    diagnose_stack,
+    explain_ci_failure,
+    restart_services,
+    summarize_logs,
+    trigger_deploy,
+)
 from mcp_tools import SYSTEM_PROMPT, TOOLS
 from settings import get_settings
 
@@ -53,6 +61,17 @@ claude = (
 )
 
 query_history: list[dict[str, Any]] = []
+
+
+def _require_devops_token(x_devops_token: str | None) -> None:
+    expected = settings.devops_agent_token
+    if not expected:
+        raise HTTPException(
+            status_code=503,
+            detail="DevOps Agent is not configured. Set DEVOPS_AGENT_TOKEN in backend/.env.",
+        )
+    if x_devops_token != expected:
+        raise HTTPException(status_code=401, detail="Invalid DevOps token.")
 
 
 @app.on_event("startup")
@@ -100,6 +119,24 @@ class ChatResponse(BaseModel):
     y_key: Optional[str] = None
     row_count: int = 0
     timestamp: str = ""
+
+
+class DevOpsLogsRequest(BaseModel):
+    service: str = "backend"
+    tail: int = 120
+    errors_only: bool = False
+
+
+class DevOpsRestartRequest(BaseModel):
+    services: list[str] = Field(default_factory=list)
+
+
+class DevOpsDeployRequest(BaseModel):
+    ref: Optional[str] = None
+
+
+class DevOpsCiExplainRequest(BaseModel):
+    log_text: str
 
 
 MCP_PROTOCOL_VERSION = "2024-11-05"
@@ -835,6 +872,7 @@ def health():
         ),
         "mcp_mode": mcp_mode,
         "mcp_server_url": settings.mcp_server_url,
+        "devops_agent": "enabled" if settings.devops_agent_token else "disabled",
         "project_id": settings.supabase_project_id,
         "timestamp": datetime.utcnow().isoformat(),
     }
@@ -843,6 +881,59 @@ def health():
 @app.get("/api/history")
 def get_history():
     return {"history": query_history[-20:][::-1]}
+
+
+@app.get("/api/devops/diagnose")
+def api_devops_diagnose(x_devops_token: str | None = Header(default=None)):
+    _require_devops_token(x_devops_token)
+    try:
+        return diagnose_stack(settings)
+    except DevOpsAgentError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/devops/logs")
+def api_devops_logs(req: DevOpsLogsRequest, x_devops_token: str | None = Header(default=None)):
+    _require_devops_token(x_devops_token)
+    try:
+        return summarize_logs(
+            settings,
+            service=req.service,
+            tail=req.tail,
+            errors_only=req.errors_only,
+        )
+    except DevOpsAgentError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/devops/restart")
+def api_devops_restart(req: DevOpsRestartRequest, x_devops_token: str | None = Header(default=None)):
+    _require_devops_token(x_devops_token)
+    try:
+        return restart_services(settings, req.services)
+    except DevOpsAgentError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/devops/deploy")
+def api_devops_deploy(req: DevOpsDeployRequest, x_devops_token: str | None = Header(default=None)):
+    _require_devops_token(x_devops_token)
+    try:
+        return trigger_deploy(settings, req.ref)
+    except DevOpsAgentError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/devops/explain-ci")
+def api_devops_explain_ci(
+    req: DevOpsCiExplainRequest,
+    x_devops_token: str | None = Header(default=None),
+):
+    _require_devops_token(x_devops_token)
+    try:
+        return explain_ci_failure(settings, req.log_text)
+    except DevOpsAgentError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/api/chat", response_model=ChatResponse)

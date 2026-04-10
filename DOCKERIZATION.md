@@ -1,5 +1,5 @@
 # SupaChat Dockerization (Ubuntu VM)
-
+#Pipeline automate testing via linux vm terminal
 This guide covers only:
 - Dockerization
 - Nginx reverse proxy
